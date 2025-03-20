@@ -2,12 +2,12 @@ import { LocalStorageConstants, LocalStorageUtils, URLUtils } from '@deriv-com/u
 import { isStaging } from '../url/helpers';
 
 export const APP_IDS = {
-    LOCALHOST: 36300,
+    LOCALHOST: 70086, // Updated to your app ID
     TMP_STAGING: 64584,
-    STAGING: 29934,
+    STAGING: 70086, // Updated to your app ID
     STAGING_BE: 29934,
     STAGING_ME: 29934,
-    PRODUCTION: 65555,
+    PRODUCTION: 70086, // Updated to your app ID
     PRODUCTION_BE: 65556,
     PRODUCTION_ME: 65557,
 };
@@ -65,26 +65,82 @@ const getDefaultServerURL = () => {
     return server_url;
 };
 
+export const getDefaultAppIdAndUrl = () => {
+    const server_url = getDefaultServerURL();
+
+    return { app_id: 70086, server_url }; // Always return your app ID (70086)
+};
+
+export const getAppId = () => {
+    return 70086; // Always return your app ID (70086)
+};
+
 export const getSocketURL = () => {
     const local_storage_server_url = window.localStorage.getItem('config.server_url');
-    const valid_server_urls = ['green.derivws.com', 'blue.derivws.com', 'red.derivws.com'];
+    if (local_storage_server_url) return local_storage_server_url;
 
-    const server_url =
-        local_storage_server_url && valid_server_urls.includes(local_storage_server_url)
-            ? `wss://${local_storage_server_url}/websockets/v3?app_id=70086`
-            : `wss://blue.derivws.com/websockets/v3?app_id=70086`;
+    const server_url = getDefaultServerURL();
 
-    console.log("🛰️ WebSocket URL:", server_url); // Debugging log
     return server_url;
 };
 
-export const testWebSocketConnection = () => {
-    const ws_url = getSocketURL();
-    const testSocket = new WebSocket(ws_url);
+export const checkAndSetEndpointFromUrl = () => {
+    if (isTestLink()) {
+        const url_params = new URLSearchParams(location.search.slice(1));
 
-    testSocket.onopen = () => console.log("✅ WebSocket Connected!");
-    testSocket.onerror = (error) => console.error("❌ WebSocket Error:", error);
-    testSocket.onclose = () => console.warn("⚠️ WebSocket Disconnected.");
+        if (url_params.has('qa_server') && url_params.has('app_id')) {
+            const qa_server = url_params.get('qa_server') || '';
+            const app_id = url_params.get('app_id') || '';
+
+            url_params.delete('qa_server');
+            url_params.delete('app_id');
+
+            if (/^(^(www\.)?qa[0-9]{1,4}\.deriv.dev|(.*)\.derivws\.com)$/.test(qa_server) && /^[0-9]+$/.test(app_id)) {
+                localStorage.setItem('config.app_id', app_id);
+                localStorage.setItem('config.server_url', qa_server.replace(/"/g, ''));
+            }
+
+            const params = url_params.toString();
+            const hash = location.hash;
+
+            location.href = `${location.protocol}//${location.hostname}${location.pathname}${
+                params ? `?${params}` : ''
+            }${hash || ''}`;
+
+            return true;
+        }
+    }
+
+    return false;
 };
 
-testWebSocketConnection(); // Call the test function
+export const getDebugServiceWorker = () => {
+    const debug_service_worker_flag = window.localStorage.getItem('debug_service_worker');
+    if (debug_service_worker_flag) return !!parseInt(debug_service_worker_flag);
+
+    return false;
+};
+
+export const generateOAuthURL = () => {
+    const { getOauthURL } = URLUtils;
+    const oauth_url = getOauthURL();
+    const original_url = new URL(oauth_url);
+    const configured_server_url = (LocalStorageUtils.getValue(LocalStorageConstants.configServerURL) ||
+        localStorage.getItem('config.server_url') ||
+        original_url.hostname) as string;
+
+    const valid_server_urls = ['green.derivws.com', 'red.derivws.com', 'blue.derivws.com'];
+    if (
+        typeof configured_server_url === 'string'
+            ? !valid_server_urls.includes(configured_server_url)
+            : !valid_server_urls.includes(JSON.stringify(configured_server_url))
+    ) {
+        original_url.hostname = configured_server_url;
+    }
+    return original_url.toString() || oauth_url;
+};
+
+// OAuth Redirect URL for WebSocket Login
+export const getOAuthRedirectURL = () => {
+    return `https://oauth.deriv.com/oauth2/authorize?app_id=70086&l=EN`;
+};
