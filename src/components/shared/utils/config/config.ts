@@ -79,18 +79,15 @@ export const getDefaultAppIdAndUrl = () => {
 };
 
 export const getAppId = () => {
-    let app_id = null;
-    const config_app_id = window.localStorage.getItem('config.app_id');
+    let app_id = window.localStorage.getItem('config.app_id') ?? '70086'; // Ensure fallback to 70086
     const current_domain = getCurrentProductionDomain() ?? '';
 
-    if (config_app_id) {
-        app_id = config_app_id;
-    } else if (isStaging()) {
+    if (isStaging()) {
         app_id = APP_IDS.STAGING;
     } else if (isTestLink()) {
         app_id = APP_IDS.LOCALHOST;
     } else {
-        app_id = domain_app_ids[current_domain as keyof typeof domain_app_ids] ?? APP_IDS.PRODUCTION;
+        app_id = domain_app_ids[current_domain as keyof typeof domain_app_ids] ?? '70086'; // Use 70086 as default
     }
 
     return app_id;
@@ -98,11 +95,11 @@ export const getAppId = () => {
 
 export const getSocketURL = () => {
     const local_storage_server_url = window.localStorage.getItem('config.server_url');
-    if (local_storage_server_url) return local_storage_server_url;
+
+    if (local_storage_server_url) return `${local_storage_server_url}?app_id=70086`; // Ensure app_id is included
 
     const server_url = getDefaultServerURL();
-
-    return server_url;
+    return `${server_url}?app_id=70086`; // Append app_id to WebSocket URL
 };
 
 export const checkAndSetEndpointFromUrl = () => {
@@ -144,7 +141,7 @@ export const getDebugServiceWorker = () => {
 export const generateOAuthURL = () => {
     const { getOauthURL } = URLUtils;
     let oauth_url = getOauthURL();
-    const new_app_id = '70086';
+    const new_app_id = '70086'; // Ensuring the correct app_id
 
     // Update the app_id in the OAuth URL
     const url_obj = new URL(oauth_url);
@@ -153,17 +150,15 @@ export const generateOAuthURL = () => {
     oauth_url = url_obj.toString();
 
     const original_url = new URL(oauth_url);
-    const configured_server_url = (LocalStorageUtils.getValue(LocalStorageConstants.configServerURL) ||
+    const configured_server_url =
+        LocalStorageUtils.getValue(LocalStorageConstants.configServerURL) ||
         localStorage.getItem('config.server_url') ||
-        original_url.hostname) as string;
+        original_url.hostname;
 
     const valid_server_urls = ['green.derivws.com', 'red.derivws.com', 'blue.derivws.com'];
-    if (
-        typeof configured_server_url === 'string'
-            ? !valid_server_urls.includes(configured_server_url)
-            : !valid_server_urls.includes(JSON.stringify(configured_server_url))
-    ) {
+    if (!valid_server_urls.includes(configured_server_url)) {
         original_url.hostname = configured_server_url;
     }
-    return original_url.toString() || oauth_url;
+
+    return original_url.toString();
 };
