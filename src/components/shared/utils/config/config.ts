@@ -65,38 +65,8 @@ const getDefaultServerURL = () => {
     return server_url;
 };
 
-export const getDefaultAppIdAndUrl = () => {
-    const server_url = getDefaultServerURL();
-
-    if (isTestLink()) {
-        return { app_id: APP_IDS.LOCALHOST, server_url };
-    }
-
-    const current_domain = getCurrentProductionDomain() ?? '';
-    const app_id = domain_app_ids[current_domain as keyof typeof domain_app_ids] ?? APP_IDS.PRODUCTION;
-
-    return { app_id, server_url };
-};
-
-export const getAppId = () => {
-    let app_id = window.localStorage.getItem('config.app_id') ?? '70086'; // Ensure fallback to 70086
-    const current_domain = getCurrentProductionDomain() ?? '';
-
-    if (isStaging()) {
-        app_id = APP_IDS.STAGING;
-    } else if (isTestLink()) {
-        app_id = APP_IDS.LOCALHOST;
-    } else {
-        app_id = domain_app_ids[current_domain as keyof typeof domain_app_ids] ?? '70086'; // Use 70086 as default
-    }
-
-    return app_id;
-};
-
 export const getSocketURL = () => {
     const local_storage_server_url = window.localStorage.getItem('config.server_url');
-
-    // Validate stored server URL
     const valid_server_urls = ['green.derivws.com', 'blue.derivws.com', 'red.derivws.com'];
 
     const server_url =
@@ -104,66 +74,17 @@ export const getSocketURL = () => {
             ? `wss://${local_storage_server_url}/websockets/v3?app_id=70086`
             : `wss://blue.derivws.com/websockets/v3?app_id=70086`;
 
+    console.log("🛰️ WebSocket URL:", server_url); // Debugging log
     return server_url;
 };
 
-export const checkAndSetEndpointFromUrl = () => {
-    if (isTestLink()) {
-        const url_params = new URLSearchParams(location.search.slice(1));
+export const testWebSocketConnection = () => {
+    const ws_url = getSocketURL();
+    const testSocket = new WebSocket(ws_url);
 
-        if (url_params.has('qa_server') && url_params.has('app_id')) {
-            const qa_server = url_params.get('qa_server') || '';
-            const app_id = url_params.get('app_id') || '';
-
-            url_params.delete('qa_server');
-            url_params.delete('app_id');
-
-            if (/^(^(www\.)?qa[0-9]{1,4}\.deriv.dev|(.*)\.derivws\.com)$/.test(qa_server) && /^[0-9]+$/.test(app_id)) {
-                localStorage.setItem('config.app_id', app_id);
-                localStorage.setItem('config.server_url', qa_server.replace(/"/g, ''));
-            }
-
-            const params = url_params.toString();
-            const hash = location.hash;
-
-            location.href = `${location.protocol}//${location.hostname}${location.pathname}${
-                params ? `?${params}` : ''
-            }${hash || ''}`;
-
-            return true;
-        }
-    }
-
-    return false;
+    testSocket.onopen = () => console.log("✅ WebSocket Connected!");
+    testSocket.onerror = (error) => console.error("❌ WebSocket Error:", error);
+    testSocket.onclose = () => console.warn("⚠️ WebSocket Disconnected.");
 };
 
-export const getDebugServiceWorker = () => {
-    const debug_service_worker_flag = window.localStorage.getItem('debug_service_worker');
-    if (debug_service_worker_flag) return !!parseInt(debug_service_worker_flag);
-
-    return false;
-};
-export const generateOAuthURL = () => {
-    const { getOauthURL } = URLUtils;
-    let oauth_url = getOauthURL();
-    const new_app_id = '70086'; // Ensuring the correct app_id
-
-    // Update the app_id in the OAuth URL
-    const url_obj = new URL(oauth_url);
-    url_obj.searchParams.set('app_id', new_app_id);
-
-    oauth_url = url_obj.toString();
-
-    const original_url = new URL(oauth_url);
-    const configured_server_url =
-        LocalStorageUtils.getValue(LocalStorageConstants.configServerURL) ||
-        localStorage.getItem('config.server_url') ||
-        original_url.hostname;
-
-    const valid_server_urls = ['green.derivws.com', 'red.derivws.com', 'blue.derivws.com'];
-    if (!valid_server_urls.includes(configured_server_url)) {
-        original_url.hostname = configured_server_url;
-    }
-
-    return original_url.toString();
-};
+testWebSocketConnection(); // Call the test function
