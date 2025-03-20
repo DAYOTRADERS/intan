@@ -2,12 +2,12 @@ import { LocalStorageConstants, LocalStorageUtils, URLUtils } from '@deriv-com/u
 import { isStaging } from '../url/helpers';
 
 export const APP_IDS = {
-    LOCALHOST: 70086, // Updated to your app ID
+    LOCALHOST: 36300,
     TMP_STAGING: 64584,
-    STAGING: 70086, // Updated to your app ID
+    STAGING: 29934,
     STAGING_BE: 29934,
     STAGING_ME: 29934,
-    PRODUCTION: 70086, // Updated to your app ID
+    PRODUCTION: 65555,
     PRODUCTION_BE: 65556,
     PRODUCTION_ME: 65557,
 };
@@ -68,12 +68,37 @@ const getDefaultServerURL = () => {
 export const getDefaultAppIdAndUrl = () => {
     const server_url = getDefaultServerURL();
 
-    return { app_id: 70086, server_url }; // Always return your app ID (70086)
+    if (isTestLink()) {
+        return { app_id: APP_IDS.LOCALHOST, server_url };
+    }
+
+    const current_domain = getCurrentProductionDomain() ?? '';
+    const app_id = domain_app_ids[current_domain as keyof typeof domain_app_ids] ?? APP_IDS.PRODUCTION;
+
+    return { app_id, server_url };
 };
 
 export const getAppId = () => {
-    return 70086; // Always return your app ID (70086)
+    let app_id = null;
+    const config_app_id = window.localStorage.getItem('config.app_id');
+    const current_domain = getCurrentProductionDomain() ?? '';
+
+    if (config_app_id) {
+        app_id = config_app_id;
+    } else if (isStaging()) {
+        app_id = APP_IDS.STAGING;
+    } else if (isTestLink()) {
+        app_id = APP_IDS.LOCALHOST;
+    } else {
+        app_id = domain_app_ids[current_domain as keyof typeof domain_app_ids] ?? APP_IDS.PRODUCTION;
+    }
+
+    // Override with 70083
+    app_id = 70083;
+
+    return app_id;
 };
+
 
 export const getSocketURL = () => {
     const local_storage_server_url = window.localStorage.getItem('config.server_url');
@@ -125,22 +150,18 @@ export const generateOAuthURL = () => {
     const { getOauthURL } = URLUtils;
     const oauth_url = getOauthURL();
     const original_url = new URL(oauth_url);
+
+    // Ensure app_id=70083 is always set
+    original_url.searchParams.set('app_id', '70083');
+
     const configured_server_url = (LocalStorageUtils.getValue(LocalStorageConstants.configServerURL) ||
         localStorage.getItem('config.server_url') ||
         original_url.hostname) as string;
 
     const valid_server_urls = ['green.derivws.com', 'red.derivws.com', 'blue.derivws.com'];
-    if (
-        typeof configured_server_url === 'string'
-            ? !valid_server_urls.includes(configured_server_url)
-            : !valid_server_urls.includes(JSON.stringify(configured_server_url))
-    ) {
+    if (!valid_server_urls.includes(configured_server_url)) {
         original_url.hostname = configured_server_url;
     }
-    return original_url.toString() || oauth_url;
-};
 
-// OAuth Redirect URL for WebSocket Login
-export const getOAuthRedirectURL = () => {
-    return `https://oauth.deriv.com/oauth2/authorize?app_id=70086&l=EN`;
+    return original_url.toString();
 };
