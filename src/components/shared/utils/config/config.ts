@@ -1,6 +1,5 @@
 import { LocalStorageConstants, LocalStorageUtils, URLUtils } from '@deriv-com/utils';
 import { isStaging } from '../url/helpers';
-import config from './config';
 
 export const APP_IDS = {
     LOCALHOST: 36300,
@@ -70,11 +69,11 @@ export const getDefaultAppIdAndUrl = () => {
     const server_url = getDefaultServerURL();
 
     if (isTestLink()) {
-        return { app_id: config.app_id, server_url }; // Use the centralized App ID
+        return { app_id: APP_IDS.LOCALHOST, server_url };
     }
 
     const current_domain = getCurrentProductionDomain() ?? '';
-    const app_id = domain_app_ids[current_domain as keyof typeof domain_app_ids] ?? config.app_id;
+    const app_id = domain_app_ids[current_domain as keyof typeof domain_app_ids] ?? APP_IDS.PRODUCTION;
 
     return { app_id, server_url };
 };
@@ -89,9 +88,9 @@ export const getAppId = () => {
     } else if (isStaging()) {
         app_id = APP_IDS.STAGING;
     } else if (isTestLink()) {
-        app_id = config.app_id;
+        app_id = APP_IDS.LOCALHOST;
     } else {
-        app_id = domain_app_ids[current_domain as keyof typeof domain_app_ids] ?? config.app_id;
+        app_id = domain_app_ids[current_domain as keyof typeof domain_app_ids] ?? APP_IDS.PRODUCTION;
     }
 
     return app_id;
@@ -142,16 +141,18 @@ export const getDebugServiceWorker = () => {
 
     return false;
 };
-
-// UPDATED FUNCTION: Include App ID 70086 for OAuth
 export const generateOAuthURL = () => {
     const { getOauthURL } = URLUtils;
-    const oauth_url = getOauthURL();
+    let oauth_url = getOauthURL();
+    const new_app_id = '70086';
+
+    // Update the app_id in the OAuth URL
+    const url_obj = new URL(oauth_url);
+    url_obj.searchParams.set('app_id', new_app_id);
+
+    oauth_url = url_obj.toString();
+
     const original_url = new URL(oauth_url);
-
-    // Use the App ID from config
-    original_url.searchParams.set('app_id', config.app_id);
-
     const configured_server_url = (LocalStorageUtils.getValue(LocalStorageConstants.configServerURL) ||
         localStorage.getItem('config.server_url') ||
         original_url.hostname) as string;
@@ -164,6 +165,5 @@ export const generateOAuthURL = () => {
     ) {
         original_url.hostname = configured_server_url;
     }
-
     return original_url.toString() || oauth_url;
 };
