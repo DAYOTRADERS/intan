@@ -96,10 +96,15 @@ export const getAppId = () => {
 export const getSocketURL = () => {
     const local_storage_server_url = window.localStorage.getItem('config.server_url');
 
-    if (local_storage_server_url) return `${local_storage_server_url}?app_id=70086`; // Ensure app_id is included
+    // Validate stored server URL
+    const valid_server_urls = ['green.derivws.com', 'blue.derivws.com', 'red.derivws.com'];
 
-    const server_url = getDefaultServerURL();
-    return `${server_url}?app_id=70086`; // Append app_id to WebSocket URL
+    const server_url =
+        local_storage_server_url && valid_server_urls.includes(local_storage_server_url)
+            ? `wss://${local_storage_server_url}/websockets/v3?app_id=70086`
+            : `wss://blue.derivws.com/websockets/v3?app_id=70086`;
+
+    return server_url;
 };
 
 export const checkAndSetEndpointFromUrl = () => {
